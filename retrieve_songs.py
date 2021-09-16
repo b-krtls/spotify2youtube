@@ -38,46 +38,45 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import pandas as pd
 
-def spotify2youtube(url):
+
+def __debug_sample_inputs():
+
     """
-    Given a Spotify song URL, find and retrieve the most relevant video to the song,
-    from Youtube.
-
-    :param url: Spotify URL of an individual song
-    :type url: class:'str'
-    :return: Youtube URL of the most relevant video to the song in Spotify URL
-    :rtype: class:'str'
-
-    :TODO:
-    This may be implemented not as functional programming but as a 
-    class like :class:'VideoMatcher' or :class:'spotify2youtube' with
-    internal methods. The functional programming method may be more beneficial
-    if a programmer wants to import indiviual functions for their own use.
+    Return a single predefined spotify URL for testing the code
     """
+    # #:HACK:
+    URL = "https://open.spotify.com/track/64f5bf2jyAkrsucnG9FXot"
+    URL = "https://open.spotify.com/track/7LNAIE5fdvAjrUJH18x5P4"   #issue
+    # URL = "https://open.spotify.com/track/7M13FwBAKWNa2jqcZeUhL6"
+    # URL = "https://open.spotify.com/track/6NYqFxemN4ZdpIO8HGrCzC"
+    # URL = "https://open.spotify.com/track/4O2N861eOnF9q8EtpH8IJu"  # Difficult
+    # URL = "https://open.spotify.com/track/1JYxCgv4Jlx2X4SYNtXgkB"
+    # URL = "https://open.spotify.com/track/25ViKfgVhbDr3IzhsjeQzU"
+    URL = "https://open.spotify.com/track/03wqvxOYgomDNUWTzesadS"
+    # URL = "https://open.spotify.com/track/4TqYHkRMUc5XpBGUcpYNep"
 
-    song_data = get_song_details(url)
-    search_query = parse_search_query(song_data)
-    # video_list = find_youtube_videos(search_query)
-    video_list = find_youtube_videos_v2(search_query)
-    matched_video_url = match_song_and_video(song_data, video_list)
-    return_code = download_youtube_song(matched_video_url)
-    return return_code
+    return  [URL]
 
 
-def read_cli_inputs():
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument(
+def read_cli_inputs(skip=False):
+
+    argparser = argparse.ArgumentParser(prog="spotify2youtube")
+    group = argparser.add_mutually_exclusive_group(required=False)
+
+    group.add_argument(
         "-f", "--file",
-        help = "Execute the script for a text file"
+        help = "Execute the script for a text file",
         )
-    argparser.add_argument(
+    group.add_argument(
         "-s", "--single",
-        help = "Execute the script for a single URL"
+        help = "Execute the script for a single URL",
         )
+
     argparser.add_argument(
         "--headless", 
         help = "Run WebDriver in headless mode",
-        action = "store_true"
+        action = "store_true",
+        default = True,
         )
     argparser.add_argument(
         "--log", 
@@ -86,15 +85,27 @@ def read_cli_inputs():
         )
     cli_args = argparser.parse_args()
 
+    if skip:    # For Debugging
+        urls = __debug_sample_inputs()
+        return urls, cli_args
     # :TODO: :FIXME: 
     # Redirect argparser attributes to correct functions to modify
     # execution
 
-    with open(sys.argv[1], 'r') as f:
-        urls = f.readlines()
-    for i, line in enumerate(urls):
-        urls[i] = line.rstrip("\n")
-    return urls
+    if cli_args.file is not None:
+        # if os.path.exists(cli_args.file):
+        # try:
+        with open(sys.argv[1], 'r') as f:
+            urls = f.readlines()
+        # :REVIEW: Should one handle exceptions?, Allowing errors to
+        # propagate is probably better  
+        for i, line in enumerate(urls):
+            urls[i] = line.rstrip("\n")
+
+    if cli_args.single is not None:
+        urls = [str(cli_args.single)]
+
+    return urls, cli_args
 
 
 def get_song_details(url: str):
@@ -244,7 +255,7 @@ def find_youtube_videos_v1(search_query):
     return video_list
 
 
-def find_youtube_videos_v2(search_query):
+def find_youtube_videos_v2(search_query, headless=True):
     """
     With the current state of Youtube, the webpage is thought to be using
     a scripting language to dynamically create the webpage, which makes it
@@ -261,7 +272,7 @@ def find_youtube_videos_v2(search_query):
     :rtype: list
     """
     chrome_options = Options()
-    chrome_options.headless = True  # Run chrome without UI
+    chrome_options.headless = headless  # Run chrome without UI
     # chrome_options.add_argument("--headless") # also works
     """
     #chrome_options.add_argument("--disable-extensions")
@@ -340,8 +351,7 @@ def find_youtube_videos_v2(search_query):
     return video_list
 
 
-
-def match_song_and_video(song_data, video_list):
+def match_song_and_video(song_data, video_list, single=True):
     """:FIXME:
     Determine and grab the video that has the highest relevance to the 
     original song name. This relevance is quantified by a calculated score
@@ -411,25 +421,32 @@ def match_song_and_video(song_data, video_list):
     matched_video_title = video_list[ind][0]
     matched_video_url = "https://www.youtube.com" \
                         + video_list[ind][1] # Add href
+    matched_video_uploader = video_list[ind][2]
 
     # print(i, video_list[i][0])
     # print(video_list[i][1])
     # print("www.youtube.com" + video_list[i][1])
 
     print("\n\t_ANS:BEST-GUESS_")
-    print(ind)
-    print(matched_video_title)
+    print("Index = {:02d} | Overall Score = {:0.3f}".format(
+        ind, scores_list[ind]
+        )
+        )
+    print(
+        matched_video_title, 
+        "| upload by {}".format(matched_video_uploader)
+        )
     print(matched_video_url)
     print("\n")
-
-    # Live Te
-    chrome_options = Options()
-    chrome_options.headless = False  # Run chrome without UI
-    # chrome_options.add_argument("--headless") # also works
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(matched_video_url)
-    input("# Press AnyKey to Leave")
-    driver.quit()
+    
+    # If a single link is provided by the user at CLI as input
+    if single:  
+        chrome_options = Options()
+        chrome_options.headless = False  # Run chrome with UI
+        driver = webdriver.Chrome(options=chrome_options)
+        driver.get(matched_video_url)
+        input("# Press AnyKey to Leave")
+        driver.quit()
 
     return matched_video_url
 
@@ -456,19 +473,39 @@ def download_youtube_song(matched_video_url): #:FIXME:
         return NotImplemented
 
 
+def spotify2youtube(url, cli_args):
+    """
+    Given a Spotify song URL, find and retrieve the most relevant video to the song,
+    from Youtube.
+
+    :param url: Spotify URL of an individual song
+    :type url: class:'str'
+    :return: Youtube URL of the most relevant video to the song in Spotify URL
+    :rtype: class:'str'
+
+    :REVIEW:
+    This may be implemented not as functional programming but as a 
+    class like :class:'VideoMatcher' or :class:'spotify2youtube' with
+    internal methods. The functional programming method may be more beneficial
+    if a programmer wants to import indiviual functions for their own use.
+    """
+
+    song_data = get_song_details(url)
+    search_query = parse_search_query(song_data)
+    # video_list = find_youtube_videos(search_query)
+    video_list = find_youtube_videos_v2(search_query, cli_args.headless)
+    matched_video_url = match_song_and_video(song_data, video_list, cli_args.single)
+    return matched_video_url
+
+
 if __name__ == '__main__':
+
+    skip = 1    # Debug Mode
+
+    urls, cli_args = read_cli_inputs(skip)  
+    # :TODO: cli_args should be fully redirected into spotify2youtube
+    for url in urls:
+        matched_video_url = spotify2youtube(url, cli_args)
+        return_code = download_youtube_song(matched_video_url)
+
     
-
-    # urls = read_cli_inputs()  
-    # #:HACK:
-    URL = "https://open.spotify.com/track/64f5bf2jyAkrsucnG9FXot"
-    URL = "https://open.spotify.com/track/7LNAIE5fdvAjrUJH18x5P4"
-    URL = "https://open.spotify.com/track/7M13FwBAKWNa2jqcZeUhL6" 
-    URL = "https://open.spotify.com/track/6NYqFxemN4ZdpIO8HGrCzC" 
-    URL = "https://open.spotify.com/track/4O2N861eOnF9q8EtpH8IJu" #Difficult
-    URL = "https://open.spotify.com/track/1JYxCgv4Jlx2X4SYNtXgkB"
-    URL = "https://open.spotify.com/track/25ViKfgVhbDr3IzhsjeQzU"
-    URL = "https://open.spotify.com/track/03wqvxOYgomDNUWTzesadS"
-    URL = "https://open.spotify.com/track/4TqYHkRMUc5XpBGUcpYNep"
-
-    spotify2youtube(URL)
