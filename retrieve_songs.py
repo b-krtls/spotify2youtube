@@ -83,6 +83,13 @@ def read_cli_inputs(skip=False):
         help = "Log the execution history in cwd",
         action = "store_true"
         )
+
+    argparser.add_argument(
+        "-d", "--download",
+        help = "Download the song(s)",
+        action = "store_true"
+        )
+
     cli_args = argparser.parse_args()
 
     if skip:    # For Debugging
@@ -95,7 +102,7 @@ def read_cli_inputs(skip=False):
     if cli_args.file is not None:
         # if os.path.exists(cli_args.file):
         # try:
-        with open(sys.argv[1], 'r') as f:
+        with open(cli_args.file, 'r') as f:
             urls = f.readlines()
         # :REVIEW: Should one handle exceptions?, Allowing errors to
         # propagate is probably better  
@@ -315,6 +322,10 @@ def find_youtube_videos_v2(search_query, headless=True):
         # # pprint(candidate_uploaders)
 
 
+    #:TODO: 
+    # :BUG: Correct html parsing for more accurate video title and
+    # uploader detection
+
     """
     each candidate
 
@@ -451,7 +462,7 @@ def match_song_and_video(song_data, video_list, single=True):
     return matched_video_url
 
 
-def download_youtube_song(matched_video_url): #:FIXME:
+def download_youtube_song(matched_video_url, song_data): #:FIXME:
     """
     OS-dependent, 
     :TODO: 
@@ -460,12 +471,22 @@ def download_youtube_song(matched_video_url): #:FIXME:
     """
     cli_os = platform.system().lower()
     print("\t_Download-Status_")
+    name_song = song_data["song"]
+    name_artist = ", ".join(song_data["artists"])
+    name_audio = name_song + " - " + name_artist
+    mystr = r'"%(title)s.%(uploader)s.%(ext)s"'
 
     if cli_os == "linux":
-        os.system("alias youtube2mp3=\"youtube-dl --extract-audio --audio-format mp3\"")
-        cmd = "youtube2mp3 {}".format(matched_video_url)
+        # alias = "youtube2mp3=\"youtube-dl --extract-audio --audio-format mp3\""
+        # cmd_alias = "alias youtube2mp3=\"{}\"".format(alias)
+        # cmd_download = "youtube2mp3 {}".format(matched_video_url)
+        # return_code = os.system(cmd_alias + "&&" + cmd_download)
+        cmd = "youtube-dl --extract-audio --audio-format mp3 --output {} {}".format(
+            mystr,
+            matched_video_url,
+            )
         return_code = os.system(cmd)
-        print(return_code)
+        print(cmd)
         return return_code
 
     if cli_os == "windows":
@@ -495,17 +516,18 @@ def spotify2youtube(url, cli_args):
     # video_list = find_youtube_videos(search_query)
     video_list = find_youtube_videos_v2(search_query, cli_args.headless)
     matched_video_url = match_song_and_video(song_data, video_list, cli_args.single)
-    return matched_video_url
+    return matched_video_url, song_data
 
 
 if __name__ == '__main__':
 
-    skip = 1    # Debug Mode
+    skip = 0    # Debug Mode
 
     urls, cli_args = read_cli_inputs(skip)  
     # :TODO: cli_args should be fully redirected into spotify2youtube
     for url in urls:
-        matched_video_url = spotify2youtube(url, cli_args)
-        return_code = download_youtube_song(matched_video_url)
-
+        matched_video_url, song_data = spotify2youtube(url, cli_args)
+        if cli_args.download:
+            return_code = download_youtube_song(matched_video_url, song_data)
+            print(return_code)
     
