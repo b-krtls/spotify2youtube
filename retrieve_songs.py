@@ -45,15 +45,15 @@ def __debug_sample_inputs():
     Return a single predefined spotify URL for testing the code
     """
     # #:HACK:
-    URL = "https://open.spotify.com/track/64f5bf2jyAkrsucnG9FXot"
-    URL = "https://open.spotify.com/track/7LNAIE5fdvAjrUJH18x5P4"   #issue
-    # URL = "https://open.spotify.com/track/7M13FwBAKWNa2jqcZeUhL6"
-    # URL = "https://open.spotify.com/track/6NYqFxemN4ZdpIO8HGrCzC"
-    # URL = "https://open.spotify.com/track/4O2N861eOnF9q8EtpH8IJu"  # Difficult
-    # URL = "https://open.spotify.com/track/1JYxCgv4Jlx2X4SYNtXgkB"
-    # URL = "https://open.spotify.com/track/25ViKfgVhbDr3IzhsjeQzU"
-    URL = "https://open.spotify.com/track/03wqvxOYgomDNUWTzesadS"
-    # URL = "https://open.spotify.com/track/4TqYHkRMUc5XpBGUcpYNep"
+    URL = "https://open.spotify.com/track/64f5bf2jyAkrsucnG9FXot"   #issue #tolerable success
+    # URL = "https://open.spotify.com/track/7LNAIE5fdvAjrUJH18x5P4"   #issue #success-at-last
+    # URL = "https://open.spotify.com/track/7M13FwBAKWNa2jqcZeUhL6"   # tolerable success
+    URL = "https://open.spotify.com/track/6NYqFxemN4ZdpIO8HGrCzC"   # success
+    # URL = "https://open.spotify.com/track/4O2N861eOnF9q8EtpH8IJu"  # Difficult #success at last
+    # URL = "https://open.spotify.com/track/1JYxCgv4Jlx2X4SYNtXgkB"   #correct
+    # URL = "https://open.spotify.com/track/25ViKfgVhbDr3IzhsjeQzU"   #correct
+    # URL = "https://open.spotify.com/track/03wqvxOYgomDNUWTzesadS"   #correct
+    # URL = "https://open.spotify.com/track/4TqYHkRMUc5XpBGUcpYNep"   #correct
 
     return  [URL]
 
@@ -86,7 +86,7 @@ def read_cli_inputs(skip=False):
 
     argparser.add_argument(
         "-d", "--download",
-        help = "Download the song(s)",
+        help = "Download the song(s)", # :TODO: add requirements as a list
         action = "store_true"
         )
 
@@ -138,7 +138,7 @@ def get_song_details(url: str):
 
     dict_ = {
         "song": name_song,
-        "artists": [i for i in name_artist.split(",") ]
+        "artists": [i for i in name_artist.split(", ") ]
     }
     # print(name_song, "==",name_artist, "\n")
     # pprint(dict_)
@@ -261,7 +261,7 @@ def find_youtube_videos_v1(search_query):
     # del temp, message
     return video_list
 
-
+# :XXX: Possibly deprecated due to buggy scraping of tags
 def find_youtube_videos_v2(search_query, headless=True):
     """
     With the current state of Youtube, the webpage is thought to be using
@@ -362,6 +362,119 @@ def find_youtube_videos_v2(search_query, headless=True):
     return video_list
 
 
+def find_youtube_videos_v3(search_query, headless=True):
+    """
+    With the current state of Youtube, the webpage is thought to be using
+    a scripting language to dynamically create the webpage, which makes it
+    difficult to use standard HTTP requests (with requests module) to :method:
+    'get' the response object with a html '<script>' tag which does not contain 
+    necessary information in a structured manner. Selenium and ChromeWebdriver 
+    is used as a result of this limitation of :module:'requests' 
+
+    :param search_query: A string literal that contains the parsed searching 
+        string that is joined with youtube search query URL
+    :type search_query: class:'str'
+    :return: The list of strings, each of which is a title of the videos as a 
+    result of the search on Youtube
+    :rtype: list
+    """
+    chrome_options = Options()
+    chrome_options.headless = headless  # Run chrome without UI
+    # chrome_options.add_argument("--headless") # also works
+  
+
+    driver = webdriver.Chrome(options=chrome_options)
+    search_url = "https://www.youtube.com/results?search_query={}".format(
+        search_query
+    )
+    print(search_url)
+    page = driver.get(search_url)
+
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    #print(type(driver.page_source))
+    driver.quit()
+
+    candidates = []
+
+    # Find all tags that are songs, eliminate all playlists
+    soup_search_results = soup.find_all(
+        "div", 
+        {
+            "id": "dismissible",
+            "class": "style-scope ytd-video-renderer"
+        }
+    ) 
+    #print(type(search_results), type(search_results[0]))
+
+    # Define the HTML tags that should be scraped for video title and uploader
+    tag_title = [
+        "a",
+        {
+            "id": "video-title",
+            # "class": "style-scope ytd-video-renderer"
+        }
+        ]
+
+    tag_uploader = [
+        "a",
+        {
+            "class": "yt-simple-endpoint style-scope yt-formatted-string",
+            "dir": "auto",
+            "spellcheck": "false"
+        }
+        ]
+
+    # pprint(len(candidates_uploaders := candidates_uploaders[::2]))
+        # # pprint(candidate_uploaders)
+
+
+    #:TODO: 
+    # :BUG: Correct html parsing for more accurate video title and
+    # uploader detection
+
+    """
+    each candidate
+
+    <a aria-label="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version by Piano Fruits Music 4 months ago 1 minute, 50 seconds 7,349 views" class="yt-simple-endpoint style-scope ytd-video-renderer" href="/watch?v=qE-sCalGpcE" id="video-title" title="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version">
+    <yt-icon class="style-scope ytd-video-renderer" hidden="" id="inline-title-icon"><!--css-build:shady--></yt-icon>
+    <yt-formatted-string aria-label="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version by Piano Fruits Music 4 months ago 1 minute, 50 seconds 7,349 views" class="style-scope ytd-video-renderer">Benjamin Cambridge 
+    - Comptine d'un autre été, l'après midi | Classical Piano Version</yt-formatted-string>
+    </a>
+    """
+
+
+    print("\t_Videos-Status_")
+    video_list = list()
+    for i, soup_search in enumerate(soup_search_results):
+        # print(str(search_result))
+        #soup_search = BeautifulSoup(str(search_result), "html.parser")
+        candidate_title = soup_search.find(*tag_title)
+        candidate_uploader = soup_search.find(*tag_uploader)
+
+        pattern_title = re.findall(r"(title=)\"(.*?)\"", str(candidate_title))
+        pattern_href = re.findall(r"(href=)\"(.*?)\"", str(candidate_title))
+        pattern_channelname = re.findall(
+            r"\>(.*?)\</a\>", 
+            str(candidate_uploader)
+            )\
+            
+        
+        # print(pattern_channelname)
+        # print(temp)
+        if pattern_title != [] and pattern_href != [] and pattern_channelname != []:  # If Regex finds at least 1 match to have a non-empty list
+            title = pattern_title[0][1]
+            href = pattern_href[0][1]
+            channelname = pattern_channelname[0]
+            video_list.append((title, href, channelname))
+            message = "# Successfully grabbed title of video({:02d})"
+        else:
+            message = "# Failed to determine title of entity({:02d})"
+        print(message.format(i), end="\n")
+    print("\n")
+    # del temp, message
+    return video_list
+
+
 def match_song_and_video(song_data, video_list, single=True):
     """:FIXME:
     Determine and grab the video that has the highest relevance to the 
@@ -382,7 +495,7 @@ def match_song_and_video(song_data, video_list, single=True):
     search_query = song_data["search_query"]
     keywords = search_query.lower().split("+")
 
-    chars_to_remove = ["-", ".", "\\", "/" , "(", ")", "\'"]
+    chars_to_remove = ["-", ".", "\\", "/" , "(", ")"]   #"\'" removed for correct french songs
     rx = '[' + re.escape(''.join(chars_to_remove)) + ']'
 
     print("\t_Scores_")
@@ -514,14 +627,14 @@ def spotify2youtube(url, cli_args):
     song_data = get_song_details(url)
     search_query = parse_search_query(song_data)
     # video_list = find_youtube_videos(search_query)
-    video_list = find_youtube_videos_v2(search_query, cli_args.headless)
+    video_list = find_youtube_videos_v3(search_query, cli_args.headless)
     matched_video_url = match_song_and_video(song_data, video_list, cli_args.single)
     return matched_video_url, song_data
 
 
 if __name__ == '__main__':
 
-    skip = 0    # Debug Mode
+    skip = 0   # Debug Mode
 
     urls, cli_args = read_cli_inputs(skip)  
     # :TODO: cli_args should be fully redirected into spotify2youtube
