@@ -8,22 +8,29 @@ How it works:
 
 Checklist:
 - youtube-dl AND ffmpeg must be installed/accessible beforehand in Linux
+    or WSL
 - :module:'bs4'  is required
 - :module:'selenium' is required
 - Chrome-Webdriver that is compatible with your current Google Chrome
     is required
 - Chrome-Webdriver should be set as a Path enviromental variable.
 
- TODO:
- - [ ] Implement asynchronous calls for WebDriver 
-    - with selenium?/asyncio/multithreading/multiprocessing or alike
- - [ ] Write docstrings for functions & comments in Sphinx/reST format
- - [ ] Check and validate style for PEP-8, i.e. check code margins and spaces
-    - Max. Line Length = 79 chars, Max. Comment & Docstring line length = 72
- - [ ] Clean up unneccessary imports 
- - [ ] Argument Parsing for using the script through a CLI
- - [ ] Possibly update the code to be hosted on a website like Github-Pages
- - [ ] Possibly incorporate different Webdrivers that the user specifies
+TODO:
+- [ ] Add a licence and README to the repo
+- [ ] Convert the downloader from youtube-dl to yt-dlp for faster downloads
+- [ ] Notify the user of possible nature of downloading videos, in certain regions
+- [ ] Notify the user of the checklist before execution
+- [ ] Turn the script into an executable program to be run
+    from the CLI
+- [ ] Implement asynchronous calls for WebDriver 
+with selenium?/asyncio/multithreading/multiprocessing or alike
+- [ ] Write docstrings for functions & comments in Sphinx/reST format
+- [ ] Check and validate style for PEP-8, i.e. check code margins and spaces
+Max. Line Length = 79 chars, Max. Comment & Docstring line length = 72
+- [ ] Clean up unneccessary imports 
+- [x] Argument Parsing for using the script through a CLI
+- [ ] Possibly update the code to be hosted on a website like Github-Pages
+- [ ] Possibly incorporate different Webdrivers that the user specifies
 """
 import os
 import sys
@@ -58,7 +65,9 @@ def __debug_sample_inputs():
     return  [URL]
 
 
-def read_cli_inputs(skip=False):
+def read_cli_inputs(_skip=False):
+    """Argument Parsing for Command Line execution, parses user input in CLI
+    """
 
     argparser = argparse.ArgumentParser(prog="spotify2youtube")
     group = argparser.add_mutually_exclusive_group(required=False)
@@ -92,7 +101,7 @@ def read_cli_inputs(skip=False):
 
     cli_args = argparser.parse_args()
 
-    if skip:    # For Debugging
+    if _skip:    # For Debugging
         urls = __debug_sample_inputs()
         return urls, cli_args
     # :TODO: :FIXME: 
@@ -117,7 +126,7 @@ def read_cli_inputs(skip=False):
 
 def get_song_details(url: str):
     """
-    Given an URL, retrieve the html code and separate it to obtain
+    Given an URL, retrieve the HTML source code and separate it to obtain
     song info
 
     :param url: Spotify song URL
@@ -173,7 +182,7 @@ def parse_search_query(song_data: dict) -> str:
     return search_query
 
 
-# :XXX: Possibly deprecated due to scoring and insufficient scraping of tags
+# :XXX: Deprecated due to scoring and insufficient scraping of tags
 def find_youtube_videos_v1(search_query):
     """
     With the current state of Youtube, the webpage is thought to be using
@@ -424,25 +433,6 @@ def find_youtube_videos_v3(search_query, headless=True):
         }
         ]
 
-    # pprint(len(candidates_uploaders := candidates_uploaders[::2]))
-        # # pprint(candidate_uploaders)
-
-
-    #:TODO: 
-    # :BUG: Correct html parsing for more accurate video title and
-    # uploader detection
-
-    """
-    each candidate
-
-    <a aria-label="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version by Piano Fruits Music 4 months ago 1 minute, 50 seconds 7,349 views" class="yt-simple-endpoint style-scope ytd-video-renderer" href="/watch?v=qE-sCalGpcE" id="video-title" title="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version">
-    <yt-icon class="style-scope ytd-video-renderer" hidden="" id="inline-title-icon"><!--css-build:shady--></yt-icon>
-    <yt-formatted-string aria-label="Benjamin Cambridge - Comptine d'un autre été, l'après midi | Classical Piano Version by Piano Fruits Music 4 months ago 1 minute, 50 seconds 7,349 views" class="style-scope ytd-video-renderer">Benjamin Cambridge 
-    - Comptine d'un autre été, l'après midi | Classical Piano Version</yt-formatted-string>
-    </a>
-    """
-
-
     print("\t_Videos-Status_")
     video_list = list()
     for i, soup_search in enumerate(soup_search_results):
@@ -459,8 +449,6 @@ def find_youtube_videos_v3(search_query, headless=True):
             )\
             
         
-        # print(pattern_channelname)
-        # print(temp)
         if pattern_title != [] and pattern_href != [] and pattern_channelname != []:  # If Regex finds at least 1 match to have a non-empty list
             title = pattern_title[0][1]
             href = pattern_href[0][1]
@@ -476,13 +464,12 @@ def find_youtube_videos_v3(search_query, headless=True):
 
 
 def match_song_and_video(song_data, video_list, single=True):
-    """:FIXME:
+    """
     Determine and grab the video that has the highest relevance to the 
     original song name. This relevance is quantified by a calculated score
     based on how many keywords in the search query appear in the video title
     in relevance to the number of words in the video title string.
     
-    :FIXME:
     :return: A dictionary in the form 
         dict_['song'] = :str:'song'
         dict_['artists'] = :list:'artists'
@@ -490,6 +477,11 @@ def match_song_and_video(song_data, video_list, single=True):
         dict_['matched_video_title'] = :str:'matched_video_title'
         dict_['matched_video_url'] = :str:'matched_video_url'
     :rtype: dict
+    
+    :TODO:
+    - Implement a fuzzy search algorithm to match spotify song
+        titles and youtube video titles more effectively. The one currently
+        in place is a primitive one.
     """
        
     search_query = song_data["search_query"]
@@ -507,7 +499,8 @@ def match_song_and_video(song_data, video_list, single=True):
         video = re.sub("&(amp;)+", ' ', video)
         video =  re.sub(rx, ' ', video) #Replace all chars_to_remove with spcce
         video = re.sub(r'(\s)\1+', r'\1', video) #Reduce whitespaces to 1 space
-        # Calculate the scores
+       
+        # Calculate the scores for how dominant the match is
 
         # # Determine if each keyword is a substring of  
         # #     video (title + channelname), and
@@ -521,7 +514,7 @@ def match_song_and_video(song_data, video_list, single=True):
         score2 = sum([(word in keywords) for word in video.split(" ")])
 
 
-        # # Attempt to "Normalize" the score with the number of words that
+        # # Attempt to "Normalize" the score with the number of words
         # #     that is in the video-title
         factor = (1/len(video.split(" "))) if len(video.split(" ")) != 0 else 0
         score1 = score1*factor
@@ -578,10 +571,15 @@ def match_song_and_video(song_data, video_list, single=True):
 def download_youtube_song(matched_video_url, song_data): #:FIXME:
     """
     OS-dependent, 
-    :TODO: 
-    check if it works in virtual machines,
+    :TODO:
+    - Check if this is even secure,
+        we are redirecting user input to a download-engine
+        through the commmand line, is it prone to 
+        some sort of injection attack?
+    Check if it works in virtual machines,
     Check if it works in WSL and other emulator-like environments
     """
+
     cli_os = platform.system().lower()
     print("\t_Download-Status_")
     name_song = song_data["song"]
@@ -590,10 +588,6 @@ def download_youtube_song(matched_video_url, song_data): #:FIXME:
     mystr = r'"%(title)s.%(uploader)s.%(ext)s"'
 
     if cli_os == "linux":
-        # alias = "youtube2mp3=\"youtube-dl --extract-audio --audio-format mp3\""
-        # cmd_alias = "alias youtube2mp3=\"{}\"".format(alias)
-        # cmd_download = "youtube2mp3 {}".format(matched_video_url)
-        # return_code = os.system(cmd_alias + "&&" + cmd_download)
         cmd = "youtube-dl --extract-audio --audio-format mp3 --output {} {}".format(
             mystr,
             matched_video_url,
